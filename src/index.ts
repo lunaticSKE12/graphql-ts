@@ -1,6 +1,8 @@
 import { HelloResolver } from './resolvers/hello';
+import {PostResolver} from './resolvers/post'
 import { Post } from './entities/Post';
 import {MikroORM} from "@mikro-orm/core"
+import "reflect-metadata";
 import {__prod__} from './constants'
 import microConfig from './mikro-orm.config'
 import express from 'express'
@@ -15,9 +17,10 @@ const main = async() => {
   const app = express();
   const apolloServer =new ApolloServer({
     schema: await buildSchema({
-      resolvers: [HelloResolver],
+      resolvers: [HelloResolver, PostResolver],
       validate: false
-    })
+    }),
+    context: () => ({ em: orm.em})
   })
 
   apolloServer.applyMiddleware({app})
