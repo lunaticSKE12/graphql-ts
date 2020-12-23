@@ -25,43 +25,129 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserResolver = void 0;
-const User_1 = require("./../entities/User");
 const type_graphql_1 = require("type-graphql");
+const User_1 = require("./../entities/User");
+const type_graphql_2 = require("type-graphql");
 require("reflect-metadata");
 const argon2_1 = __importDefault(require("argon2"));
 let UsernamePasswordInput = class UsernamePasswordInput {
 };
 __decorate([
-    type_graphql_1.Field(),
+    type_graphql_2.Field(),
     __metadata("design:type", String)
 ], UsernamePasswordInput.prototype, "username", void 0);
 __decorate([
-    type_graphql_1.Field(),
+    type_graphql_2.Field(),
     __metadata("design:type", String)
 ], UsernamePasswordInput.prototype, "password", void 0);
 UsernamePasswordInput = __decorate([
-    type_graphql_1.InputType()
+    type_graphql_2.InputType()
 ], UsernamePasswordInput);
+let FieldError = class FieldError {
+};
+__decorate([
+    type_graphql_2.Field(),
+    __metadata("design:type", String)
+], FieldError.prototype, "field", void 0);
+__decorate([
+    type_graphql_2.Field(),
+    __metadata("design:type", String)
+], FieldError.prototype, "message", void 0);
+FieldError = __decorate([
+    type_graphql_1.ObjectType()
+], FieldError);
+let UserResponse = class UserResponse {
+};
+__decorate([
+    type_graphql_2.Field(() => [FieldError], { nullable: true }),
+    __metadata("design:type", Array)
+], UserResponse.prototype, "errors", void 0);
+__decorate([
+    type_graphql_2.Field(() => User_1.User, { nullable: true }),
+    __metadata("design:type", User_1.User)
+], UserResponse.prototype, "user", void 0);
+UserResponse = __decorate([
+    type_graphql_1.ObjectType()
+], UserResponse);
 let UserResolver = class UserResolver {
     register(options, { em }) {
         return __awaiter(this, void 0, void 0, function* () {
+            if (options.username.length <= 2) {
+                return {
+                    errors: [{
+                            field: 'username',
+                            message: 'username length must be greater than 2'
+                        }]
+                };
+            }
+            if (options.password.length <= 2) {
+                return {
+                    errors: [{
+                            field: 'password',
+                            message: 'password length must be greater than 2'
+                        }]
+                };
+            }
             const hashedPassword = yield argon2_1.default.hash(options.password);
             const user = em.create(User_1.User, { username: options.username, password: hashedPassword });
-            yield em.persistAndFlush(user);
-            return user;
+            try {
+                yield em.persistAndFlush(user);
+            }
+            catch (error) {
+                if (error.detail.includes("already exists")) {
+                    return {
+                        errors: [{
+                                field: "username",
+                                message: "username already exists"
+                            }]
+                    };
+                }
+            }
+            return { user };
+        });
+    }
+    login(options, { em }) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const user = yield em.findOne(User_1.User, { username: options.username });
+            if (!user) {
+                return {
+                    errors: [{
+                            field: "username",
+                            message: "That username doesn't exist"
+                        }]
+                };
+            }
+            const valid = yield argon2_1.default.verify(user.password, options.password);
+            if (!valid) {
+                return {
+                    errors: [{
+                            field: "password",
+                            message: "incorrect password"
+                        }]
+                };
+            }
+            return { user };
         });
     }
 };
 __decorate([
-    type_graphql_1.Mutation(() => User_1.User),
-    __param(0, type_graphql_1.Arg('option')),
-    __param(1, type_graphql_1.Ctx()),
+    type_graphql_2.Mutation(() => UserResponse),
+    __param(0, type_graphql_2.Arg('options')),
+    __param(1, type_graphql_2.Ctx()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [UsernamePasswordInput, Object]),
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "register", null);
+__decorate([
+    type_graphql_2.Mutation(() => UserResponse),
+    __param(0, type_graphql_2.Arg('options')),
+    __param(1, type_graphql_2.Ctx()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [UsernamePasswordInput, Object]),
+    __metadata("design:returntype", Promise)
+], UserResolver.prototype, "login", null);
 UserResolver = __decorate([
-    type_graphql_1.Resolver()
+    type_graphql_2.Resolver()
 ], UserResolver);
 exports.UserResolver = UserResolver;
 //# sourceMappingURL=user.js.map
